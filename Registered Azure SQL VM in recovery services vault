@@ -1,0 +1,31 @@
+# Prompt the user for input
+$subscriptionID = Read-Host "Enter the Azure Subscription ID"
+$SQLservername = Read-Host "Enter the SQL Server name"
+
+# Connect to Azure
+Connect-AzAccount -ErrorAction Stop
+
+# Set the subscription context
+Set-AzContext -Subscription $subscriptionID -ErrorAction Stop
+
+# Loop through all vaults
+Get-AzRecoveryServicesVault | ForEach-Object {
+    $vault = $_
+    
+    # Loop through all containers in the vault
+    Get-AzRecoveryServicesBackupContainer -ContainerType "AzureVMAppContainer" -VaultId $vault.ID | ForEach-Object {
+        $container = $_
+
+        # Check for backup items related to the specified SQL server
+        $backupitem = Get-AzRecoveryServicesBackupProtectableItem -Container $container -WorkloadType MSSQL -VaultId $vault.ID
+
+        $backupitem | Where-Object Servername -Contains $SQLservername | ForEach-Object {
+            # Create a custom object with the desired properties
+            [PSCustomObject]@{
+                VaultName      = $vault.Name
+                FriendlyName   = $_.FriendlyName
+                Servername     = $_.Servername
+             }
+        }
+    }
+} | Format-Table -AutoSize
